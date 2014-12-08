@@ -1,0 +1,325 @@
+'By ScubaManSpiff - b.c.smith42 at gmail.com.
+
+Public Const pi = 3.14159265358979
+Public Const pi_simple = 3
+
+Public Function TheCountOfMonteCarlo(Above_Value As Double, _
+    Sample_Range As Range, _
+    Sample_Size As Integer, _
+    Optional Trials_Num As Long = 1000, _
+    Optional Conv_pct As Double = 1, _
+    Optional Cumul_Point As Boolean = False, _
+    Optional Num_Tails As Integer = 1) As Variant
+    'Optional UseDefault As Boolean = False) As Double
+
+' Function does simple simulation and returns number of results over 'Above_value'
+' Note: Inefficient as weighing a burning elephant using individual specks of sawdust
+
+    Dim TrialTotal As Double
+    Dim Range_Length As Long
+    Dim counterxx As Long
+    Dim Counteryy As Long
+    Dim WinsCount As Long
+    Dim SampleArr As Variant
+    Dim ArrLength As Integer
+    Dim Temp As Long
+    
+If Num_Tails < 1 Or Num_Tails > 2 Then
+    TheCountOfMonteCarlo = "http://25.media.tumblr.com/tumblr_mbrgox7zlO1rhxzoao1_400.jpg"
+Else
+    
+    If Conv_pct > 1 Or Conv_pct < 0 Then Conv_pct = 1
+    
+    SampleArr = Sample_Range.Value 'Pass Range to an Array
+    ArrLength = UBound(SampleArr) ' Arr starts at 1, don't ask me why
+    'Range_Length =UBound(Sample_Range, 1) - LBound(Sample_Range, 1)
+    For counterxx = 1 To Trials_Num
+        TrialTotal = 0  'Reset for the next trial round
+        For Counteryy = 1 To Sample_Size
+            If Rnd <= Conv_pct Then ' First only choose from distribution if randomly less then conversion
+                TrialTotal = TrialTotal + SampleArr(Int(ArrLength * Rnd + 1), 1) ' Sum up each random pick CInt converts to Int Data Type, not really necessary
+            End If
+        Next Counteryy
+        If Cumul_Point = False Then
+            If TrialTotal >= Above_Value Then WinsCount = WinsCount + 1 ' Cumulative Distribution
+        Else
+            If TrialTotal = Above_Value Then WinsCount = WinsCount + 1 ' Point Distribution
+        End If
+        If counterxx Mod 100 = 0 Then DoEvents ' Allow VBA to pass back control on every 100th loop so doesn't lock up
+    Next counterxx
+    
+    If Num_Talis = 2 And Cumul_Point = False Then
+        TheCountOfMonteCarlo = (WinsCount / Trials_Num) / 2
+    Else
+        TheCountOfMonteCarlo = (WinsCount / Trials_Num)
+    End If
+
+End If
+
+'http://25.media.tumblr.com/tumblr_mbrgox7zlO1rhxzoao1_400.jpg  To be used for making fun of people choosing 3 tailed distributions
+
+End Function
+
+
+Public Function StatSig(Traffic1 As Long, _
+    Traffic2 As Long, _
+    Conv1 As Long, _
+    Conv2 As Long, _
+    Optional Num_Tails As Integer = 2) As Variant
+
+' Function Calculates Statistical Significance
+
+    Dim Conversion1 As Double
+    Dim Conversion2 As Double
+    Dim SError1 As Double
+    Dim SError2 As Double
+    Dim Zscore As Double
+    Dim PValue As Double
+    Dim Tempqq As Long
+    Dim Badness As Boolean
+    
+Badness = False
+Badness = Conv1 > Traffic1 Or Conv2 > Traffic2 Or Conv1 < 0 Or Conv2 < 0 Or Traffic1 < 0 Or Traffic2 < 0
+    
+    'knock out the situations that don't make sense
+If Num_Tails < 1 Or Num_Tails > 2 Then
+    StatSig = "http://25.media.tumblr.com/tumblr_mbrgox7zlO1rhxzoao1_400.jpg"
+ElseIf Badness Then
+    StatSig = "http://en.wikipedia.org/wiki/Conversion_rate"
+ElseIf (Conv1 + Conv2) < 20 Then
+    StatSig = "Too few conversion to calculate"
+Else
+    
+    'calculate conversion, then standard error, then zscore
+    Conversion1 = Conv1 / Traffic1
+    Conversion2 = Conv2 / Traffic2
+    
+    SError1 = Sqr((Conversion1 * (1 - Conversion1)) / Traffic1)
+    SError2 = Sqr((Conversion2 * (1 - Conversion2)) / Traffic2)
+    
+    Zscore = (Conversion1 - Conversion2) / Sqr(SError1 ^ 2 + SError2 ^ 2)
+    
+    PValue = Application.WorksheetFunction.NormDist(Zscore, 0, 1, True)
+    
+    If Num_Tails = 1 Then
+        StatSig = 1 - PValue
+    ElseIf Num_Tails = 2 Then
+        StatSig = 1 - ((0.5 - Abs(PValue - 0.5)) * 2)
+    Else
+        StatSig = "WTF"
+    End If
+    
+End If
+
+End Function
+
+Public Sub Tryout()
+
+Dim x As Variant
+
+x = MarginOfError(100000, 100000, 1000, 1050, 1)
+
+End Sub
+
+
+Public Function MarginOfError(Traffic1 As Long, _
+    Traffic2 As Long, _
+    Conv1 As Long, _
+    Conv2 As Long, _
+    UpperLower As Double, _
+    Optional ConfInt As Double = 0.95) As Variant
+
+' Function Calculates Confidence Interval
+
+    Dim Conversion1 As Double
+    Dim Conversion2 As Double
+    Dim ConversionAvg As Double
+    Dim SError1 As Double
+    Dim SError2 As Double
+    Dim SErrorPooled As Double
+    Dim Zscore As Double
+    Dim Z2 As Double
+    Dim Tempqq As Long
+    Dim Badness As Boolean
+    Dim ConversionDiff As Double
+    
+Badness = False
+Badness = Conv1 > Traffic1 Or Conv2 > Traffic2 Or Conv1 < 0 Or Conv2 < 0 Or Traffic1 < 0 Or Traffic2 < 0
+    
+    'knock out the situations that don't make sense
+If UpperLower = 0 Then
+    MarginOfError = "Positive or negative integer for higher or lower bound"
+ElseIf Badness Then
+    MarginOfError = "http://en.wikipedia.org/wiki/Conversion_rate"
+ElseIf (Conv1 + Conv2) < 20 Then
+    MarginOfError = "Too few conversion to calculate"
+Else
+    
+    'calculate conversion, then standard error, then zscore
+    Conversion1 = Conv1 / Traffic1
+    Conversion2 = Conv2 / Traffic2
+    
+    SError1 = Sqr((Conversion1 * (1 - Conversion1)) / Traffic1)
+    SError2 = Sqr((Conversion2 * (1 - Conversion2)) / Traffic2)
+    SErrorPooled = Sqr(SError1 ^ 2 + SError2 ^ 2)
+    
+    Z2 = Application.WorksheetFunction.NormInv(ConfInt, 0, 1)
+    
+    ConversionAvg = (Conversion1 + Conversion2) / 2
+    ConversionDiff = Conversion2 - Conversion1
+    
+    If UpperLower < 0 Then
+        MarginOfError = Application.WorksheetFunction.Max(((ConversionDiff - (SErrorPooled * Z2)) / Conversion1), -1)
+    ElseIf UpperLower > 0 Then
+        MarginOfError = ((ConversionDiff + (SErrorPooled * Z2)) / Conversion1)
+    Else
+        MarginOfError = "WTF"
+    End If
+    
+End If
+
+End Function
+
+
+
+Function CellFormula(Rng As Range) As String
+'
+' For displaying cell formula in a range
+'
+    CellFormula = Rng.Formula
+    
+End Function
+
+Function Activesheetxx()
+
+Activesheetxx = ActiveSheet.Index
+
+End Function
+
+Public Function TestFlex()
+
+    TestFlex = FlexiLookup("df", Worksheets("Sheet1").Range("H11:I16"), 2)
+
+End Function
+
+
+Public Function FlexiLookup(FlexiText As String, LookupInner As Range, ColumnYY As Integer, Optional Reverseq As Boolean = False) As String
+
+'Flexible Lookup.  Vlookup and search combined
+
+Dim counterxx As Integer
+Dim FlexiString As String
+
+counterxx = LookupInner.Rows.Count
+
+If Reverseq = False Then
+
+    For ttt = 1 To counterxx
+    
+        FlexiString = LookupInner(ttt, 1)
+    
+        If InStr(UCase(FlexiString), UCase(FlexiText)) >= 1 Then
+        
+            FlexiLookup = LookupInner(ttt, ColumnYY)
+        
+            Exit Function
+        
+        End If
+        
+    
+    Next ttt
+
+Else
+
+    For ttt = 1 To counterxx
+    
+        FlexiString = LookupInner(counterxx - ttt + 1, 1)
+    
+        If InStr(UCase(FlexiString), UCase(FlexiText)) >= 1 Then
+        
+            FlexiLookup = LookupInner(counterxx - ttt + 1, ColumnYY)
+        
+            Exit Function
+        
+        End If
+        
+    
+    Next ttt
+    
+End If
+    FlexiLookup = "Error 4.4"
+
+End Function
+
+Public Function distance(lat1, lon1, lat2, lon2)
+'For calculating the distance betweeen points on the globe
+  Dim theta, dist
+  theta = lon1 - lon2
+  dist = Sin(deg2rad2(lat1)) * Sin(deg2rad2(lat2)) + Cos(deg2rad2(lat1)) * Cos(deg2rad2(lat2)) * Cos(deg2rad2(theta))
+  dist = acos2(dist)
+  dist = rad2deg2(dist)
+  distance = dist * 60 * 1.1515
+End Function
+
+
+'
+'  This function get the arccos function from arctan function
+'
+Public Function acos2(Rad)
+  If Abs(Rad) <> 1 Then
+    acos2 = pi / 2 - Atn(Rad / Sqr(1 - Rad * Rad))
+  ElseIf Rad = -1 Then
+    acos2 = pi
+  End If
+End Function
+
+
+'
+'  This function converts decimal degrees to radians
+'
+Public Function deg2rad2(Deg)
+    deg2rad2 = CDbl(Deg * pi / 180)
+End Function
+
+'
+'  This function converts radians to decimal degrees
+'
+Public Function rad2deg2(Rad)
+    rad2deg2 = CDbl(Rad * 180 / pi)
+End Function
+
+Function CountUniques(Selection As Range)
+'   Not my code
+'   Unfortunately dont remember origional source
+'
+
+    Dim rewq As Range
+    Dim c As Range
+    Dim list As Object
+    Dim y
+    Dim j As Long
+    Dim Sht As Worksheet
+    Dim strSheets As String
+    
+    Set list = CreateObject("Scripting.Dictionary")
+    
+    Set rewq = Selection.SpecialCells(xlCellTypeVisible)
+    
+    j = 0
+    
+    For Each c In rewq
+        If Not list.exists(c.Value) Then
+            j = j + 1
+            list.Add c.Value, j
+        End If
+    Next c
+    y = list.keys
+
+    CountUniques = UBound(y) + 1
+
+ExitHere:
+
+    Set list = Nothing
+    Set rewq = Nothing
+    
+End Function
